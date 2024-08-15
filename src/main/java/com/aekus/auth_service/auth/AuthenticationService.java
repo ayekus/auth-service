@@ -1,11 +1,15 @@
 package com.aekus.auth_service.auth;
 
+import com.aekus.auth_service.email.EmailService;
+import com.aekus.auth_service.email.EmailTemplateName;
 import com.aekus.auth_service.role.RoleRepository;
 import com.aekus.auth_service.user.Token;
 import com.aekus.auth_service.user.TokenRepository;
 import com.aekus.auth_service.user.User;
 import com.aekus.auth_service.user.UserRepository;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,8 +25,12 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
+    private final EmailService emailService;
 
-    public void register(RegistrationRequest request) {
+    @Value("${application.mailing.frontend.activation-url}")
+    private String activationUrl;
+
+    public void register(RegistrationRequest request) throws MessagingException {
         var userRole = roleRepository.findRoleByName("USER")
                 // todo: add better exception handling
                 .orElseThrow(() -> new IllegalStateException("Role USER was not initialized"));
@@ -41,9 +49,11 @@ public class AuthenticationService {
         sendValidationEmail(user);
     }
 
-    private void sendValidationEmail(User user) {
+    private void sendValidationEmail(User user) throws MessagingException {
         var newToken = generateAndSaveActivationToken(user);
-        // todo: Add logic to send email
+
+        emailService.sendEmail(user.getEmail(), user.getFullName(), EmailTemplateName.ACTIVATE_ACCOUNT,
+                activationUrl, newToken, "AekusAuth Account Activation");
     }
 
     private String generateAndSaveActivationToken(User user) {
